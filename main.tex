@@ -22,8 +22,15 @@
 \usepackage{pifont}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,calc,shapes.geometric,fit,backgrounds}
 \definecolor{misdgreen}{RGB}{34,139,34}
 \definecolor{misdred}{RGB}{200,40,40}
+\definecolor{stagecol}{RGB}{52,103,168}
+\definecolor{outcol}{RGB}{245,238,220}
+\definecolor{boxcol}{RGB}{225,235,248}
+\definecolor{badbg}{RGB}{252,228,228}
+\definecolor{goodbg}{RGB}{223,240,223}
 \newcommand{\good}[1]{\textcolor{misdgreen}{#1}}
 \newcommand{\bad}[1]{\textcolor{misdred}{#1}}
 \newcommand{\cmark}{\ding{51}}
@@ -69,6 +76,32 @@ Under this lens the standard recipe looks much worse than its in-distribution nu
 \item Actionable guidance for practitioners: prefer light-touch refinement; do not impose a fixed answer-format scaffold if cross-lingual or OOD robustness matters; do not assume verification filtering adds value without a random-drop control.
 \end{itemize}
 
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  font=\scriptsize,
+  raw/.style={draw, rounded corners, fill=boxcol, align=center, inner sep=3pt, minimum height=7mm},
+  op/.style={draw, rounded corners, fill=stagecol!18, align=center, inner sep=3pt},
+  good/.style={draw, rounded corners, fill=goodbg, align=center, inner sep=2.5pt},
+  bad/.style={draw, rounded corners, fill=badbg, align=center, inner sep=2.5pt},
+  ar/.style={-{Latex[length=1.6mm]}, thick, gray!70},
+]
+\node[raw] (raw) {Raw math\\(English)};
+% naive lane
+\node[op, above right=3mm and 7mm of raw] (naive) {\textbf{Naive refine}\\$+\,$\texttt{\char92 boxed} $+$ En rules};
+\node[bad, right=7mm of naive] (n2) {En GSM8K \textbf{81}\,\ding{51}\\Zh CMATH \textbf{35}\,\ding{55}};
+\node[text=misdred, align=center, right=2mm of n2, font=\scriptsize\bfseries] (ntax) {format\\tax};
+% MISD lane
+\node[op, below right=3mm and 7mm of raw, fill=misdgreen!15] (misd) {\textbf{MISD (ours)}\\verify, no scaffold};
+\node[good, right=7mm of misd] (m2) {En GSM8K \textbf{69}\\Zh CMATH \textbf{77}\,\ding{51}};
+\node[text=misdgreen, align=center, right=2mm of m2, font=\scriptsize\bfseries] (mbal) {$+8.9$\\9-bench};
+\draw[ar] (raw) -- (naive); \draw[ar] (naive) -- (n2);
+\draw[ar] (raw) -- (misd);  \draw[ar] (misd) -- (m2);
+\end{tikzpicture}
+\caption{\textbf{The format-scaffolding generalization tax.} Naively rewriting math SFT data into a canonical \texttt{\char92 boxed} English format lifts in-distribution extraction (GSM8K) but collapses cross-lingual transfer (CMATH $-30$). Our framework \textbf{MISD} verifies structure \emph{without} imposing the scaffolding, staying balanced and winning the honest nine-benchmark suite by $+8.9$.}
+\label{fig:motivation}
+\end{figure}
+
 \section{Related Work}
 \textbf{Instruction-data selection.} LIMA \citep{zhou2023lima}, IFD/Cherry \citep{li2023quantity}, SuperFiltering \citep{li2024superfiltering}, and DEITA \citep{liu2023deita} score and subselect general instruction data. These are domain-agnostic; we include them as baselines and show they transfer poorly to math.
 \textbf{Math-data synthesis and refinement.} MetaMath \citep{yu2023metamath}, WizardMath/Evol-Instruct \citep{xu2023wizardlm}, and MathGenie \citep{lu2024mathgenie} rewrite or augment math problems, frequently using symbolic/solver checks to filter. Our work does not propose a new such method; it \emph{stress-tests} the operators these methods share.
@@ -76,7 +109,32 @@ Under this lens the standard recipe looks much worse than its in-distribution nu
 \textbf{Format and verification.} Boxed-answer extraction originates in MATH/Minerva-style evaluation \citep{hendrycks2021math}; SymPy answer-equivalence is a common cleaning primitive. We are not aware of prior work isolating their \emph{OOD cost} under a controlled, single-variable design.
 
 \section{The Refinement Operators We Study}
-We instantiate the standard recipe as a three-stage pipeline and treat each stage as a toggleable operator.
+We instantiate the standard recipe as a three-stage pipeline and treat each stage as a toggleable operator (Figure~\ref{fig:arch}).
+
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[
+  font=\scriptsize,
+  io/.style={draw, rounded corners, fill=boxcol, align=left, text width=2.45cm, inner sep=4pt, minimum height=15mm},
+  onode/.style={draw, rounded corners, fill=outcol, align=left, text width=2.45cm, inner sep=4pt, minimum height=15mm},
+  algo/.style={draw, rounded corners, fill=stagecol, text=white, align=center, text width=1.75cm, inner sep=4pt, minimum height=15mm},
+  fin/.style={draw, rounded corners, fill=goodbg, align=left, text width=2.45cm, inner sep=4pt, minimum height=15mm},
+  ar/.style={-{Latex[length=2mm]}, very thick, stagecol},
+  node distance=4.5mm,
+]
+\node[io] (in) {\textbf{Input}\\\,\\Square $ABCD$ inscribed under $y{=}x^2{-}8x{+}12$; find area. [asy fig]\\ \textit{ans:} 16};
+\node[algo, right=of in] (a1) {\textbf{Alg.\,1}\\Structure\\\textit{(typing)}};
+\node[onode, right=of a1] (o1) {\textbf{Output 1}\\\,\\tags: \{visual:\,Y, question:\,find, vars:\,Y, mcq:\,N\}};
+\node[algo, right=of o1] (a2) {\textbf{Alg.\,2}\\Rewrite\\\textit{(R1--R5)}};
+\node[onode, right=of a2] (o2) {\textbf{Output 2}\\\,\\$+$ ``A,C on curve''\\$+$ \texttt{\char92 boxed} prompt};
+\node[algo, right=of o2] (a3) {\textbf{Alg.\,3}\\Verify\\\textit{(S1--S5,}\\\textit{SymPy)}};
+\node[fin, right=of a3] (fin) {\textbf{Final}\\\,\\S1--S5 pass; SymPy ans\,$=16$\,\ding{51}\\$\Rightarrow$ keep sample};
+\draw[ar] (in)--(a1); \draw[ar] (a1)--(o1); \draw[ar] (o1)--(a2);
+\draw[ar] (a2)--(o2); \draw[ar] (o2)--(a3); \draw[ar] (a3)--(fin);
+\end{tikzpicture}
+\caption{\textbf{MISD framework and data flow on one example.} A raw problem passes three toggleable operators: \textbf{Structure} types it (Output~1), \textbf{Rewrite} adds rule-triggered edits (Output~2), and \textbf{Verify} checks structural safety (S1--S5) and SymPy answer-equivalence before keeping the sample. Our controlled study finds the Rewrite stage's format scaffolding (notably the \texttt{\char92 boxed} prompt) helps in-distribution but taxes OOD; \textbf{MISD (ours)} therefore keeps Structure$+$Verify and disables those rewrites.}
+\label{fig:arch}
+\end{figure*}
 
 \noindent\textbf{Structure (typing).} Each raw problem is typed along six fields \{setup, conditions, question kind, format constraint, visual \texttt{asy}, MCQ\} by Qwen2.5-7B-Instruct cross-checked with regex. Typing gates which rewrite rules may fire.
 
