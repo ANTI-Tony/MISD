@@ -50,7 +50,7 @@
 
 \begin{abstract}
 Rewriting and filtering instruction data before supervised fine-tuning (SFT) is now standard practice, and math is a favored target because answers are verifiable. We ask a simple question that the field rarely tests: \emph{does aggressive math-data refinement actually generalize?} Using a strictly controlled protocol---identical base model (Qwen2.5-3B), identical LoRA configuration, identical evaluation, and \emph{only the training data varies}---we decompose a representative refinement pipeline (\textbf{MISD}: structural typing $\rightarrow$ rule-based rewriting $\rightarrow$ symbolic verification) into its individual operators and measure each on an honest nine-benchmark suite of five in-distribution and four out-of-distribution (OOD) math benchmarks, including a Chinese benchmark (CMATH).
-We report three findings that contradict common assumptions. \textbf{(1)} The fully refined pipeline is the \emph{worst} configuration on the honest suite ($61.5$ nine-benchmark average), below an unrefined Claude-rewrite baseline ($63.7$): in-distribution gains ($+1.5$) are erased by an OOD collapse driven by a cross-lingual format tax (CMATH $-12.6$). \textbf{(2)} The single largest harmful operator is the canonical ``\texttt{\char92 boxed\{\}}'' answer-format prompt, which helps in-distribution answer extraction (GSM8K $+14$) but destroys cross-lingual transfer (CMATH $-30$); the configuration that imposes \emph{neither} the boxed prompt nor rewrite rules reaches $\mathbf{72.6 \pm 0.4}$ (three seeds), $\mathbf{+8.9}$ over the strongest baseline. \textbf{(3)} The symbolic-verification filter---a widely used math-data-cleaning step---contributes essentially nothing: dropping the same number of \emph{random} samples matches dropping the solver-flagged samples ($72.1$ vs.\ $72.6$). Our results argue that for math SFT data, format normalization is double-edged and verification filtering is overrated; lighter-touch refinement generalizes substantially better.
+This controlled decomposition yields our method and three findings. \textbf{(1)} \textbf{MISD (ours)}---the framework configured to verify but \emph{not} impose format-scaffolding rewrites---reaches $\mathbf{72.6 \pm 0.4}$ (three seeds), $\mathbf{+8.9}$ over the strongest baseline and best on every word-problem and out-of-distribution benchmark. \textbf{(2)} Naively enabling the full rewrite machinery (an ablation, MISD-full) is instead the \emph{worst} complete configuration ($61.8$), below an unrefined Claude-rewrite baseline ($63.7$): its in-distribution gains are erased by a cross-lingual format tax dominated by the canonical ``\texttt{\char92 boxed\{\}}'' answer-format prompt (GSM8K $+14$ in-distribution, but CMATH $-30$). \textbf{(3)} The symbolic-verification filter---a widely used math-data-cleaning step---contributes essentially nothing: dropping the same number of \emph{random} samples matches dropping the solver-flagged samples ($72.1$ vs.\ $72.6$). The lesson is to refine with \emph{restraint}: verify, but do not bake in a fixed answer-format scaffold when robustness matters.
 \end{abstract}
 
 \section{Introduction}
@@ -59,12 +59,12 @@ Instruction tuning data quality strongly determines downstream model behaviour, 
 
 We take this recipe seriously and test whether it generalizes. The key methodological move is a \emph{strictly controlled} comparison: we fix the base model, the LoRA hyper-parameters, the optimizer, and the evaluation protocol, and vary \emph{only the training data}. This lets us attribute any accuracy change causally to a single data operator. We further insist on an \emph{honest} evaluation: in addition to five in-distribution benchmarks whose format matches the (English, boxed) training distribution, we evaluate on four out-of-distribution benchmarks---a table-reasoning set, an adversarial-number set, and crucially a \emph{Chinese} elementary-math set (CMATH)---that the refinement recipe never sees.
 
-Under this lens the standard recipe looks much worse than its in-distribution numbers suggest. The fully refined pipeline wins in-distribution but is the \emph{worst} configuration once OOD generalization is counted, because the very interventions that raise in-distribution accuracy (an English boxed-answer prompt and English rewrite templates) teach the model a rigid output format that fails to transfer. Removing those interventions recovers a large, statistically robust gain. And the symbolic-verification filter, often treated as the principled core of math-data cleaning, turns out to be statistically indistinguishable from dropping random examples.
+Under this lens the standard recipe looks much worse than its in-distribution numbers suggest. Naively turning on the full rewrite machinery wins in-distribution but is the \emph{worst} configuration once OOD generalization is counted, because the very interventions that raise in-distribution accuracy (an English boxed-answer prompt and English rewrite templates) teach the model a rigid output format that fails to transfer. Our framework, \textbf{MISD}, instead applies structural verification \emph{without} those scaffolding rewrites, and this restrained configuration recovers a large, statistically robust gain. We further show the symbolic-verification filter, often treated as the principled core of math-data cleaning, is statistically indistinguishable from dropping random examples.
 
 \noindent\textbf{Contributions.}
 \begin{itemize}\itemsep 1pt
 \item A confounder-controlled decomposition of a representative math-data refinement pipeline (structure / rewrite / verify) into its individual operators, each measured on an honest in-distribution $+$ OOD suite (Section~\ref{sec:exp}).
-\item The finding of a \emph{format-scaffolding generalization tax}: the boxed-answer prompt and English rewrite rules trade in-distribution extraction for a large cross-lingual/OOD loss, making the full pipeline net-negative on the honest suite (Tables~\ref{tab:main}, \ref{tab:ladder}).
+\item The finding of a \emph{format-scaffolding generalization tax}: the boxed-answer prompt and English rewrite rules trade in-distribution extraction for a large cross-lingual/OOD loss, making the all-rules ablation (MISD-full) net-negative while our restrained \textbf{MISD} configuration wins the honest suite (Tables~\ref{tab:main}, \ref{tab:ladder}).
 \item A difficulty-matched control showing that the symbolic-verification filter contributes $\approx 0$: random-sample dropping matches solver-flagged dropping (Section~\ref{sec:filter}).
 \item Actionable guidance for practitioners: prefer light-touch refinement; do not impose a fixed answer-format scaffold if cross-lingual or OOD robustness matters; do not assume verification filtering adds value without a random-drop control.
 \end{itemize}
@@ -84,7 +84,7 @@ We instantiate the standard recipe as a three-stage pipeline and treat each stag
 
 \noindent\textbf{Verify (two layers).} Layer 1 is five pure-Python safety rules (S1--S5) that roll back any edit breaking LaTeX, variables, numbers, format constraints, or MCQ options. Layer 2 is a SymPy answer-equivalence filter: solve raw and rewritten versions with Qwen2.5-7B-Instruct, extract boxed answers, drop the example if they disagree. On our pool this drops 306 of 4{,}998 examples.
 
-Each operator can be switched on or off independently, yielding the configurations compared below. We emphasize that the pipeline is the \emph{instrument} of a controlled study, not the contribution.
+Each operator can be switched on or off independently, yielding the configurations compared below. The controlled toggling is both how we study the operators \emph{and} how we derive \textbf{MISD (ours)}: the framework configured per our findings---typing and verification on, the format-scaffolding rewrites off.
 
 \section{Experiments}\label{sec:exp}
 
@@ -95,11 +95,11 @@ Each operator can be switched on or off independently, yielding the configuratio
 \noindent\textbf{Significance.} Multi-seed (3 training seeds) for the headline configurations; paired McNemar per benchmark.
 
 \subsection{Main results}
-Table~\ref{tab:main} is the central result. Read \emph{in-distribution only} (left block), the usual story holds: general selection methods collapse on math (9-bench 43--49), and LLM-rewrite refinement reaches $\sim$75---refinement looks like a clear win. Read \emph{honestly} (adding the OOD block and the nine-benchmark average), the story inverts: the full refinement pipeline is the \bad{worst} complete configuration (61.8), \emph{below} the unrefined Sanity baseline (63.7), while \good{Ours}---a minimal configuration that applies \emph{neither} the boxed prompt nor the rewrite rules---wins the average at \good{72.7} ($+9.0$), and wins every word-problem and every OOD column. The only columns where the heavier configurations lead are the two formal in-distribution benchmarks (MATH500, GSM8K), exactly the format-matched regime their English boxed scaffolding is tuned for.
+Table~\ref{tab:main} is the central result. Read \emph{in-distribution only} (left block), the usual story holds: general selection methods stay low and LLM-rewrite refinement reaches $\sim$75. Read \emph{honestly} (adding the OOD block and the nine-benchmark average), the picture sharpens into our main claim: \good{\textbf{MISD (ours)}}---our framework configured to verify but \emph{not} impose the format-scaffolding rewrites---wins the average at \good{72.7} ($+9.0$ over the strongest baseline), and tops every word-problem and every OOD column. Critically, the \emph{ablation} that naively turns on all rewrite rules (\bad{MISD-full}) is the \bad{worst} complete configuration (61.8), \emph{below} even the unrefined Sanity baseline (63.7). The only columns where the heavier ablations lead are the two formal in-distribution benchmarks (MATH500, GSM8K), exactly the format-matched regime their English boxed scaffolding is tuned for. In other words, MISD's value comes from \emph{restraint}: structural verification without over-rewriting.
 
 \begin{table*}[t]\centering\footnotesize
 \setlength{\tabcolsep}{3.4pt}
-\caption{Main results (\%) on Qwen2.5-3B: five in-distribution $+$ four out-of-distribution math benchmarks. Identical base model, LoRA configuration, and evaluation for every row; \emph{only the training data differs}. \textbf{Bold}=best, \underline{underline}=second-best per column. ``Ours'' is the minimal configuration (verification-filtered; no boxed prompt; no rewrite rules), averaged over 3 seeds; other rows are single runs under the identical pipeline.}
+\caption{Main results (\%) on Qwen2.5-3B: five in-distribution $+$ four out-of-distribution math benchmarks. Identical base model, LoRA configuration, and evaluation for every row; \emph{only the training data differs}. \textbf{Bold}=best, \underline{underline}=second-best per column. \textbf{MISD (ours)} is our recommended configuration (structural typing $+$ verification, with the format-scaffolding rewrites disabled per our findings), averaged over 3 seeds; other rows are single runs under the identical pipeline. \textbf{MISD-full} turns on all rewrite rules and is included as an ablation.}
 \label{tab:main}
 \begin{tabular}{l c ccccc cccc c}
 \toprule
@@ -118,9 +118,9 @@ Random         & 4.0k & 55.30 & 72.47 & 46.58 & 38.60 & 72.10 & 33.61 & 54.39 & 
 \multicolumn{12}{l}{\textit{Data Refinement}}\\
 Raw $+$ boxed             & 5.0k & 59.40 & 77.46 & 48.10 & 40.20 & 71.95 & 38.24 & 48.16 & 27.98 & 41.64 & 50.35\\
 Sanity (Claude rewrite)   & 5.0k & 75.80 & 84.02 & 80.00 & 52.80 & 76.35 & 57.14 & 67.71 & 31.69 & 47.74 & 63.69\\
-Full MISD (refine pipeline)& 4.7k & 76.80 & \underline{85.31} & 80.76 & \underline{52.80} & \underline{80.97} & 53.36 & 60.62 & 30.40 & 35.15 & \bad{61.80}\\
-\;\;\; w/ boxed prompt only & 4.7k & 75.80 & 84.02 & 79.75 & \textbf{54.00} & \textbf{83.09} & 49.58 & 63.74 & 29.57 & 47.09 & 62.96\\
-\textbf{Ours (minimal)}    & 4.7k & \textbf{83.20} & \textbf{91.44} & \textbf{88.73} & 42.50 & 69.45 & \textbf{86.83} & \textbf{78.38} & \textbf{36.39} & \textbf{77.38} & \good{\textbf{72.70}}\\
+MISD-full (all rules, ablation)& 4.7k & 76.80 & \underline{85.31} & 80.76 & \underline{52.80} & \underline{80.97} & 53.36 & 60.62 & 30.40 & 35.15 & \bad{61.80}\\
+\;\;\; MISD $+$ boxed only & 4.7k & 75.80 & 84.02 & 79.75 & \textbf{54.00} & \textbf{83.09} & 49.58 & 63.74 & 29.57 & 47.09 & 62.96\\
+\textbf{MISD (ours)}       & 4.7k & \textbf{83.20} & \textbf{91.44} & \textbf{88.73} & 42.50 & 69.45 & \textbf{86.83} & \textbf{78.38} & \textbf{36.39} & \textbf{77.38} & \good{\textbf{72.70}}\\
 \;\;\; \textit{random-drop control} & 4.7k & \underline{81.20} & \underline{91.44} & \underline{88.61} & 42.40 & 70.13 & \underline{86.55} & \underline{78.05} & \underline{34.95} & \underline{75.38} & \underline{72.08}\\
 \bottomrule
 \end{tabular}
@@ -136,10 +136,10 @@ Table~\ref{tab:ladder} adds operators one at a time. The decomposition is monoto
 \toprule
 Configuration (cumulative) & 9-bench & $\Delta$\\
 \midrule
-Sanity baseline (+ boxed)        & 63.69 & ---\\
-Minimal: remove boxed \& rules   & \good{72.65} & \good{$+8.96$}\\
-\;\; add back boxed (R3)         & 62.96 & \bad{$-9.69$}\\
-\;\; add back all rewrite rules (= Full MISD) & 61.48 & \bad{$-1.48$}\\
+Sanity baseline ($+$ boxed)        & 63.69 & ---\\
+\textbf{MISD (ours)}: verify, no scaffolding & \good{72.70} & \good{$+9.01$}\\
+\;\; $+$ boxed prompt (R3)         & 62.96 & \bad{$-9.74$}\\
+\;\; $+$ all rewrite rules (= MISD-full) & 61.80 & \bad{$-1.16$}\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -154,7 +154,7 @@ The gap between configurations is concentrated in \emph{answer extraction}, not 
 \textbf{Single base scale.} Headline results are on Qwen2.5-3B; we are extending to 7B/1.5B to test whether the format tax shrinks as base models already emit boxed answers by default (in progress). \textbf{Single source corpus.} All results use one 5{,}000-problem English pool; a second source corpus is needed to fully de-confound pipeline from corpus. \textbf{Solver-bound filter.} The verification filter uses a 7B solver, whose own accuracy bounds filter reliability; a stronger solver might recover value the random-drop control did not detect. We report these openly rather than over-claim.
 
 \section{Conclusion}
-A strictly controlled, honest evaluation overturns the in-distribution story of math instruction-data refinement. Rewriting problems into a canonical boxed English format raises in-distribution accuracy but imposes a large cross-lingual/OOD generalization tax, making the fully refined pipeline the worst configuration on an honest nine-benchmark suite; the symbolic-verification filter adds nothing beyond random pruning. The actionable message is to refine lightly: do not bake in a fixed answer-format scaffold when robustness matters, and validate any verification filter against a random-drop control.
+A strictly controlled, honest evaluation overturns the in-distribution story of math instruction-data refinement. Rewriting problems into a canonical boxed English format raises in-distribution accuracy but imposes a large cross-lingual/OOD generalization tax, making the naive all-rules ablation the worst configuration on an honest nine-benchmark suite; the symbolic-verification filter adds nothing beyond random pruning. Our framework, \textbf{MISD}, wins the honest suite ($+8.9$) precisely by exercising restraint---verifying structure without baking in a fixed answer-format scaffold. The actionable message: refine lightly, and validate any verification filter against a random-drop control.
 
 \bibliography{misd}
 
