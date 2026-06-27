@@ -76,31 +76,66 @@ Under this lens the standard recipe looks much worse than its in-distribution nu
 \item Actionable guidance for practitioners: prefer light-touch refinement; do not impose a fixed answer-format scaffold if cross-lingual or OOD robustness matters; do not assume verification filtering adds value without a random-drop control.
 \end{itemize}
 
-\begin{figure}[t]
+\begin{figure*}[t]
 \centering
 \begin{tikzpicture}[
   font=\scriptsize,
-  raw/.style={draw, rounded corners, fill=boxcol, align=center, inner sep=3pt, minimum height=7mm},
-  op/.style={draw, rounded corners, fill=stagecol!18, align=center, inner sep=3pt},
-  good/.style={draw, rounded corners, fill=goodbg, align=center, inner sep=2.5pt},
-  bad/.style={draw, rounded corners, fill=badbg, align=center, inner sep=2.5pt},
-  ar/.style={-{Latex[length=1.6mm]}, thick, gray!70},
+  raw/.style={draw=gray!55, rounded corners=2pt, fill=blue!4, align=left, text width=2.7cm, inner sep=3.5pt, minimum height=10mm},
+  ref/.style={draw=gray!55, rounded corners=2pt, fill=orange!7, align=left, text width=3.0cm, inner sep=3.5pt, minimum height=10mm},
+  mth/.style={draw=stagecol!55, rounded corners=2pt, fill=stagecol!12, align=center, text width=1.15cm, inner sep=2.5pt, font=\scriptsize\itshape},
+  bub/.style={draw=gray!55, rounded corners=4pt, fill=gray!5, align=left, text width=3.7cm, inner sep=4pt},
+  ar/.style={-{Latex[length=1.5mm]}, gray!65},
+  colcap/.style={font=\bfseries\scriptsize, text=gray!55},
 ]
-\node[raw] (raw) {Raw math\\(English)};
-% naive lane
-\node[op, above right=3mm and 7mm of raw] (naive) {\textbf{Naive refine}\\$+\,$\texttt{\char92 boxed} $+$ En rules};
-\node[bad, right=7mm of naive] (n2) {En GSM8K \textbf{81}\,\ding{51}\\Zh CMATH \textbf{35}\,\ding{55}};
-\node[text=misdred, align=center, right=2mm of n2, font=\scriptsize\bfseries] (ntax) {format\\tax};
-% MISD lane
-\node[op, below right=3mm and 7mm of raw, fill=misdgreen!15] (misd) {\textbf{MISD (ours)}\\verify, no scaffold};
-\node[good, right=7mm of misd] (m2) {En GSM8K \textbf{69}\\Zh CMATH \textbf{77}\,\ding{51}};
-\node[text=misdgreen, align=center, right=2mm of m2, font=\scriptsize\bfseries] (mbal) {$+8.9$\\9-bench};
-\draw[ar] (raw) -- (naive); \draw[ar] (naive) -- (n2);
-\draw[ar] (raw) -- (misd);  \draw[ar] (misd) -- (m2);
+\tikzset{
+  frowny/.pic={\draw[misdred,thick] (0,0) circle(2.1mm); \fill[misdred] (-0.8mm,0.5mm) circle(0.22mm); \fill[misdred](0.8mm,0.5mm) circle(0.22mm); \draw[misdred,thick] (-0.95mm,-1.0mm) .. controls (0,-0.2mm) .. (0.95mm,-1.0mm);},
+  smiley/.pic={\draw[misdgreen,thick] (0,0) circle(2.1mm); \fill[misdgreen] (-0.8mm,0.5mm) circle(0.22mm); \fill[misdgreen](0.8mm,0.5mm) circle(0.22mm); \draw[misdgreen,thick] (-0.95mm,-0.3mm) .. controls (0,-1.3mm) .. (0.95mm,-0.3mm);},
+}
+\def\xr{2.3} \def\xm{4.55} \def\xf{6.95} \def\xe{8.0} \def\xb{11.2}
+% column captions
+\node[colcap] at (\xr,1.15) {Raw data}; \node[colcap] at (\xf,1.15) {Refined data}; \node[colcap] at (\xb,1.15) {Human review};
+% header bars
+\node[rounded corners, fill=gray!18, font=\bfseries, inner sep=3pt, text width=3.2cm, align=center] at (\xr,1.75) {Existing / naive refinement};
+% ---- row a: over-formatting ----
+\def\ya{0}
+\node[raw] (ar) at (\xr,\ya) {Find the area of square $ABCD$.};
+\node[mth] (am) at (\xm,\ya) {Rewrite};
+\node[ref] (af) at (\xf,\ya) {\dots\ \textcolor{misdred}{\textbf{Give the final answer inside} \texttt{\char92 boxed\{\}}}.};
+\pic at (\xe,\ya) {frowny};
+\node[bub] (ab) at (\xb,\ya) {\textbf{\textit{Format tax.}} English boxed scaffold; model then fails on Chinese (CMATH $-30$).};
+% ---- row b: filter = pruning ----
+\def\yb{-1.65}
+\node[raw] (br) at (\xr,\yb) {(a hard competition-level MATH problem)};
+\node[mth] (bm) at (\xm,\yb) {SymPy\\filter};
+\node[ref] (bf) at (\xf,\yb) {\textcolor{misdred}{\textbf{[\,dropped\,]}}};
+\pic at (\xe,\yb) {frowny};
+\node[bub] (bb) at (\xb,\yb) {\textbf{\textit{Difficulty pruning.}} Equals random-drop; the filter's \emph{choice} adds no gain.};
+% ---- row c: all rules = noise ----
+\def\yc{-3.3}
+\node[raw] (cr) at (\xr,\yc) {If $n$ books cost \$$12$, find \dots};
+\node[mth] (cm) at (\xm,\yc) {All\\rules};
+\node[ref] (cf) at (\xf,\yc) {\dots\ \textcolor{misdred}{\textbf{Let $n$ be a positive integer. Let $u=\dots$}}};
+\pic at (\xe,\yc) {frowny};
+\node[bub] (cb) at (\xb,\yc) {\textbf{\textit{Noise.}} Unused English templates injected into clean problems.};
+% ---- ours ----
+\node[rounded corners, fill=misdgreen!20, font=\bfseries, inner sep=3pt, text width=3.2cm, align=center] at (\xr,-4.35) {Our framework (MISD)};
+\def\yd{-5.55}
+\node[raw] (dr) at (\xr,\yd) {Find the area \dots\ (English \& Chinese)};
+\node[mth, draw=misdgreen!60, fill=misdgreen!12] (dm) at (\xm,\yd) {\textbf{MISD}};
+\node[ref, fill=misdgreen!8] (df) at (\xf,\yd) {Verified, \textcolor{misdgreen}{\textbf{no forced format}}; structure preserved.};
+\pic at (\xe,\yd) {smiley};
+\node[bub, fill=misdgreen!6] (db) at (\xb,\yd) {\textbf{\textit{Generalizes.}} $+8.9$ on the honest 9-bench; CMATH $\mathbf{77}$, no format collapse.};
+% arrows
+\foreach \r in {a,b,c,d}{ \draw[ar] (\r r) -- (\r m); \draw[ar] (\r m) -- (\r f); \draw[ar] (\r f) -- (\xe-0.28,\csname y\r\endcsname);}
+% backgrounds
+\begin{scope}[on background layer]
+\node[fill=gray!7, rounded corners, fit=(ar)(cb)(am), inner sep=2.4mm] {};
+\node[fill=misdgreen!7, rounded corners, fit=(dr)(db), inner sep=2.4mm] {};
+\end{scope}
 \end{tikzpicture}
-\caption{\textbf{The format-scaffolding generalization tax.} Naively rewriting math SFT data into a canonical \texttt{\char92 boxed} English format lifts in-distribution extraction (GSM8K) but collapses cross-lingual transfer (CMATH $-30$). Our framework \textbf{MISD} verifies structure \emph{without} imposing the scaffolding, staying balanced and winning the honest nine-benchmark suite by $+8.9$.}
+\caption{\textbf{Limitations of naive math instruction-data refinement, and our fix.} Existing/naive refinement operators each introduce a failure mode: rewriting into a canonical \texttt{\char92 boxed} English format imposes a cross-lingual \emph{format tax} (CMATH $-30$); solver-based filtering merely performs difficulty pruning (matched by random dropping); applying all rewrite rules injects unused template noise. \textbf{MISD} verifies structure \emph{without} forcing a format, preserving cross-lingual generalization and winning the honest nine-benchmark suite by $+8.9$.}
 \label{fig:motivation}
-\end{figure}
+\end{figure*}
 
 \section{Related Work}
 \textbf{Instruction-data selection.} LIMA \citep{zhou2023lima}, IFD/Cherry \citep{li2023quantity}, SuperFiltering \citep{li2024superfiltering}, and DEITA \citep{liu2023deita} score and subselect general instruction data. These are domain-agnostic; we include them as baselines and show they transfer poorly to math.
