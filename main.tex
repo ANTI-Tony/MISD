@@ -95,11 +95,11 @@ Each operator can be switched on or off independently, yielding the configuratio
 \noindent\textbf{Significance.} Multi-seed (3 training seeds) for the headline configurations; paired McNemar per benchmark.
 
 \subsection{Main results}
-Table~\ref{tab:main} is the central result. Read \emph{in-distribution only} (left block), the usual story holds: general selection methods collapse on math (50--55), and LLM-rewrite refinement reaches $\sim$75---refinement looks like a clear win. Read \emph{honestly} (adding the OOD block and the nine-benchmark average), the story inverts: the full refinement pipeline is the \bad{worst} complete configuration (61.8), \emph{below} the unrefined Sanity baseline (63.7), while \good{Ours}---a minimal configuration that applies \emph{neither} the boxed prompt nor the rewrite rules---wins the average at \good{72.7} ($+9.0$), and wins every word-problem and every OOD column. The only columns where the heavier configurations lead are the two formal in-distribution benchmarks (MATH500, GSM8K), exactly the format-matched regime their English boxed scaffolding is tuned for.
+Table~\ref{tab:main} is the central result. Read \emph{in-distribution only} (left block), the usual story holds: general selection methods collapse on math (9-bench 43--49), and LLM-rewrite refinement reaches $\sim$75---refinement looks like a clear win. Read \emph{honestly} (adding the OOD block and the nine-benchmark average), the story inverts: the full refinement pipeline is the \bad{worst} complete configuration (61.8), \emph{below} the unrefined Sanity baseline (63.7), while \good{Ours}---a minimal configuration that applies \emph{neither} the boxed prompt nor the rewrite rules---wins the average at \good{72.7} ($+9.0$), and wins every word-problem and every OOD column. The only columns where the heavier configurations lead are the two formal in-distribution benchmarks (MATH500, GSM8K), exactly the format-matched regime their English boxed scaffolding is tuned for.
 
 \begin{table*}[t]\centering\footnotesize
 \setlength{\tabcolsep}{3.4pt}
-\caption{Main results (\%) on Qwen2.5-3B: five in-distribution $+$ four out-of-distribution math benchmarks. Identical base model, LoRA configuration, and evaluation for every row; \emph{only the training data differs}. \textbf{Bold}=best, \underline{underline}=second-best among complete rows. ``Ours'' is the minimal configuration (verification-filtered; no boxed prompt; no rewrite rules), averaged over 3 seeds. Selection-baseline OOD evaluation in progress ($-$).}
+\caption{Main results (\%) on Qwen2.5-3B: five in-distribution $+$ four out-of-distribution math benchmarks. Identical base model, LoRA configuration, and evaluation for every row; \emph{only the training data differs}. \textbf{Bold}=best, \underline{underline}=second-best per column. ``Ours'' is the minimal configuration (verification-filtered; no boxed prompt; no rewrite rules), averaged over 3 seeds; other rows are single runs under the identical pipeline.}
 \label{tab:main}
 \begin{tabular}{l c ccccc cccc c}
 \toprule
@@ -108,20 +108,20 @@ Table~\ref{tab:main} is the central result. Read \emph{in-distribution only} (le
 Method & Data & SVAMP & ASDiv & AddSub & MATH500 & GSM8K & MAWPS & TabMWP & G-Hard & CMATH & \textbf{Avg} \\
 \midrule
 \multicolumn{12}{l}{\textit{Data Selection (reproduced)}}\\
-IFD            & 4.0k & 43.70 & 58.35 & 37.22 & 41.80 & 70.05 & $-$ & $-$ & $-$ & $-$ & $-$\\
-SuperFiltering & 4.0k & 44.30 & 67.05 & 37.72 & 40.60 & 70.51 & $-$ & $-$ & $-$ & $-$ & $-$\\
-Random         & 4.0k & 46.30 & 68.90 & 40.76 & 38.20 & 71.11 & $-$ & $-$ & $-$ & $-$ & $-$\\
-LIMA           & 4.0k & 49.60 & 66.62 & 35.70 & 43.20 & 70.36 & $-$ & $-$ & $-$ & $-$ & $-$\\
-Cherry         & 4.0k & 47.80 & 67.48 & 38.99 & 43.00 & 71.42 & $-$ & $-$ & $-$ & $-$ & $-$\\
-DEITA          & 4.0k & 52.50 & 69.47 & 45.82 & 40.60 & 67.93 & $-$ & $-$ & $-$ & $-$ & $-$\\
+IFD            & 4.0k & 48.90 & 67.76 & 42.78 & 39.20 & 72.33 & 26.05 & 41.22 & 22.97 & 24.44 & 42.85\\
+SuperFiltering & 4.0k & 52.90 & 72.18 & 45.82 & 41.20 & 73.16 & 31.93 & 46.18 & 23.96 & 26.32 & 45.96\\
+LIMA           & 4.0k & 52.80 & 64.48 & 37.47 & 41.00 & 71.34 & 35.71 & 44.19 & 22.37 & 30.92 & 44.48\\
+DEITA          & 4.0k & 47.00 & 64.76 & 39.49 & 42.00 & 75.44 & 42.44 & 46.60 & 25.78 & 37.41 & 46.77\\
+Cherry         & 4.0k & 54.40 & 74.04 & 52.66 & 42.00 & 72.10 & 37.39 & 46.60 & 28.28 & 31.02 & 48.72\\
+Random         & 4.0k & 55.30 & 72.47 & 46.58 & 38.60 & 72.10 & 33.61 & 54.39 & 30.25 & 37.78 & 49.01\\
 \midrule
 \multicolumn{12}{l}{\textit{Data Refinement}}\\
-Raw $+$ boxed             & 5.0k & 60.50 & 81.74 & 54.68 & 38.60 & 73.54 & $-$ & $-$ & $-$ & $-$ & $-$\\
+Raw $+$ boxed             & 5.0k & 59.40 & 77.46 & 48.10 & 40.20 & 71.95 & 38.24 & 48.16 & 27.98 & 41.64 & 50.35\\
 Sanity (Claude rewrite)   & 5.0k & 75.80 & 84.02 & 80.00 & 52.80 & 76.35 & 57.14 & 67.71 & 31.69 & 47.74 & 63.69\\
 Full MISD (refine pipeline)& 4.7k & 76.80 & \underline{85.31} & 80.76 & \underline{52.80} & \underline{80.97} & 53.36 & 60.62 & 30.40 & 35.15 & \bad{61.80}\\
 \;\;\; w/ boxed prompt only & 4.7k & 75.80 & 84.02 & 79.75 & \textbf{54.00} & \textbf{83.09} & 49.58 & 63.74 & 29.57 & 47.09 & 62.96\\
 \textbf{Ours (minimal)}    & 4.7k & \textbf{83.20} & \textbf{91.44} & \textbf{88.73} & 42.50 & 69.45 & \textbf{86.83} & \textbf{78.38} & \textbf{36.39} & \textbf{77.38} & \good{\textbf{72.70}}\\
-\;\;\; \textit{random-drop control} & 4.7k & \underline{81.20} & 91.44 & \underline{88.61} & 42.40 & 70.13 & \underline{86.55} & \underline{78.05} & \underline{34.95} & \underline{75.38} & \underline{72.08}\\
+\;\;\; \textit{random-drop control} & 4.7k & \underline{81.20} & \underline{91.44} & \underline{88.61} & 42.40 & 70.13 & \underline{86.55} & \underline{78.05} & \underline{34.95} & \underline{75.38} & \underline{72.08}\\
 \bottomrule
 \end{tabular}
 \end{table*}
