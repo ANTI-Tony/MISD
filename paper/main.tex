@@ -1,0 +1,174 @@
+%File: MISD paper for AAAI 2026
+\documentclass[letterpaper]{article} % DO NOT CHANGE THIS
+\usepackage[submission]{aaai2026}  % DO NOT CHANGE THIS
+\usepackage{times}  % DO NOT CHANGE THIS
+\usepackage{helvet}  % DO NOT CHANGE THIS
+\usepackage{courier}  % DO NOT CHANGE THIS
+\usepackage[hyphens]{url}  % DO NOT CHANGE THIS
+\usepackage{graphicx} % DO NOT CHANGE THIS
+\urlstyle{rm} % DO NOT CHANGE THIS
+\def\UrlFont{\rm}  % DO NOT CHANGE THIS
+\usepackage{natbib}  % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
+\usepackage{caption} % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
+\frenchspacing  % DO NOT CHANGE THIS
+\setlength{\pdfpagewidth}{8.5in} % DO NOT CHANGE THIS
+\setlength{\pdfpageheight}{11in} % DO NOT CHANGE THIS
+
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{pifont}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\definecolor{misdgreen}{RGB}{34,139,34}
+\definecolor{misdred}{RGB}{200,40,40}
+\newcommand{\good}[1]{\textcolor{misdgreen}{#1}}
+\newcommand{\bad}[1]{\textcolor{misdred}{#1}}
+\newcommand{\cmark}{\ding{51}}
+\newcommand{\xmark}{\ding{55}}
+
+\pdfinfo{
+/TemplateVersion (2026.1)
+}
+
+\setcounter{secnumdepth}{2}
+
+\title{When Refining Math Instruction Data Hurts:\\A Controlled Study of Format Scaffolding and Verification Filtering}
+
+\author{
+    Anonymous Submission
+}
+\affiliations{
+    Anonymous Submission\\
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Rewriting and filtering instruction data before supervised fine-tuning (SFT) is now standard practice, and math is a favored target because answers are verifiable. We ask a simple question that the field rarely tests: \emph{does aggressive math-data refinement actually generalize?} Using a strictly controlled protocol---identical base model (Qwen2.5-3B), identical LoRA configuration, identical evaluation, and \emph{only the training data varies}---we decompose a representative refinement pipeline (\textbf{MISD}: structural typing $\rightarrow$ rule-based rewriting $\rightarrow$ symbolic verification) into its individual operators and measure each on an honest nine-benchmark suite of five in-distribution and four out-of-distribution (OOD) math benchmarks, including a Chinese benchmark (CMATH).
+We report three findings that contradict common assumptions. \textbf{(1)} The fully refined pipeline is the \emph{worst} configuration on the honest suite ($61.5$ nine-benchmark average), below an unrefined Claude-rewrite baseline ($63.7$): in-distribution gains ($+1.5$) are erased by an OOD collapse driven by a cross-lingual format tax (CMATH $-12.6$). \textbf{(2)} The single largest harmful operator is the canonical ``\texttt{\char92 boxed\{\}}'' answer-format prompt, which helps in-distribution answer extraction (GSM8K $+14$) but destroys cross-lingual transfer (CMATH $-30$); the configuration that imposes \emph{neither} the boxed prompt nor rewrite rules reaches $\mathbf{72.6 \pm 0.4}$ (three seeds), $\mathbf{+8.9}$ over the strongest baseline. \textbf{(3)} The symbolic-verification filter---a widely used math-data-cleaning step---contributes essentially nothing: dropping the same number of \emph{random} samples matches dropping the solver-flagged samples ($72.1$ vs.\ $72.6$). Our results argue that for math SFT data, format normalization is double-edged and verification filtering is overrated; lighter-touch refinement generalizes substantially better.
+\end{abstract}
+
+\section{Introduction}
+
+Instruction tuning data quality strongly determines downstream model behaviour, and a large literature now ``refines'' SFT data by selecting high-value examples \citep{li2023quantity,li2024superfiltering,liu2023deita} or rewriting them into cleaner forms \citep{xu2023wizardlm}. Mathematics is an especially attractive domain for refinement because answers are \emph{verifiable}: one can rewrite a problem, re-solve both versions, and keep only examples whose answers agree \citep{lu2024mathgenie}. This has produced a standard math-data recipe---\textit{structure the problem, rewrite it into a canonical format with an explicit answer marker, and filter by symbolic answer equivalence}.
+
+We take this recipe seriously and test whether it generalizes. The key methodological move is a \emph{strictly controlled} comparison: we fix the base model, the LoRA hyper-parameters, the optimizer, and the evaluation protocol, and vary \emph{only the training data}. This lets us attribute any accuracy change causally to a single data operator. We further insist on an \emph{honest} evaluation: in addition to five in-distribution benchmarks whose format matches the (English, boxed) training distribution, we evaluate on four out-of-distribution benchmarks---a table-reasoning set, an adversarial-number set, and crucially a \emph{Chinese} elementary-math set (CMATH)---that the refinement recipe never sees.
+
+Under this lens the standard recipe looks much worse than its in-distribution numbers suggest. The fully refined pipeline wins in-distribution but is the \emph{worst} configuration once OOD generalization is counted, because the very interventions that raise in-distribution accuracy (an English boxed-answer prompt and English rewrite templates) teach the model a rigid output format that fails to transfer. Removing those interventions recovers a large, statistically robust gain. And the symbolic-verification filter, often treated as the principled core of math-data cleaning, turns out to be statistically indistinguishable from dropping random examples.
+
+\noindent\textbf{Contributions.}
+\begin{itemize}\itemsep 1pt
+\item A confounder-controlled decomposition of a representative math-data refinement pipeline (structure / rewrite / verify) into its individual operators, each measured on an honest in-distribution $+$ OOD suite (Section~\ref{sec:exp}).
+\item The finding of a \emph{format-scaffolding generalization tax}: the boxed-answer prompt and English rewrite rules trade in-distribution extraction for a large cross-lingual/OOD loss, making the full pipeline net-negative on the honest suite (Tables~\ref{tab:honest}, \ref{tab:ladder}).
+\item A difficulty-matched control showing that the symbolic-verification filter contributes $\approx 0$: random-sample dropping matches solver-flagged dropping (Section~\ref{sec:filter}).
+\item Actionable guidance for practitioners: prefer light-touch refinement; do not impose a fixed answer-format scaffold if cross-lingual or OOD robustness matters; do not assume verification filtering adds value without a random-drop control.
+\end{itemize}
+
+\section{Related Work}
+\textbf{Instruction-data selection.} LIMA \citep{zhou2023lima}, IFD/Cherry \citep{li2023quantity}, SuperFiltering \citep{li2024superfiltering}, and DEITA \citep{liu2023deita} score and subselect general instruction data. These are domain-agnostic; we include them as baselines and show they transfer poorly to math.
+\textbf{Math-data synthesis and refinement.} MetaMath \citep{yu2023metamath}, WizardMath/Evol-Instruct \citep{xu2023wizardlm}, and MathGenie \citep{lu2024mathgenie} rewrite or augment math problems, frequently using symbolic/solver checks to filter. Our work does not propose a new such method; it \emph{stress-tests} the operators these methods share.
+\textbf{Less-is-more.} LIMO \citep{ye2025limo} and s1 \citep{muennighoff2025s1} argue small curated sets suffice for reasoning. Our minimal-refinement result is convergent evidence, but our mechanism is different: we attribute the effect to removing a format tax rather than to data scale.
+\textbf{Format and verification.} Boxed-answer extraction originates in MATH/Minerva-style evaluation \citep{hendrycks2021math}; SymPy answer-equivalence is a common cleaning primitive. We are not aware of prior work isolating their \emph{OOD cost} under a controlled, single-variable design.
+
+\section{The Refinement Operators We Study}
+We instantiate the standard recipe as a three-stage pipeline and treat each stage as a toggleable operator.
+
+\noindent\textbf{Structure (typing).} Each raw problem is typed along six fields \{setup, conditions, question kind, format constraint, visual \texttt{asy}, MCQ\} by Qwen2.5-7B-Instruct cross-checked with regex. Typing gates which rewrite rules may fire.
+
+\noindent\textbf{Rewrite (additive rules).} Five \emph{additive} rules (content may only be added, never deleted): R1 visual-label binding, R2 unit clarification, \textbf{R3 boxed-answer prompt} (append ``\textit{Give the final answer inside \texttt{\char92 boxed\{\}}}''), R4 integer-type declaration, R5 long-LaTeX intermediate variable. R3 is by far the most frequently triggered ($\sim$82\%).
+
+\noindent\textbf{Verify (two layers).} Layer 1 is five pure-Python safety rules (S1--S5) that roll back any edit breaking LaTeX, variables, numbers, format constraints, or MCQ options. Layer 2 is a SymPy answer-equivalence filter: solve raw and rewritten versions with Qwen2.5-7B-Instruct, extract boxed answers, drop the example if they disagree. On our pool this drops 306 of 4{,}998 examples.
+
+Each operator can be switched on or off independently, yielding the configurations compared below. We emphasize that the pipeline is the \emph{instrument} of a controlled study, not the contribution.
+
+\section{Experiments}\label{sec:exp}
+
+\noindent\textbf{Setup.} Base model Qwen2.5-3B (base). LoRA $r{=}16$, $\alpha{=}32$, lr $1\!\times\!10^{-4}$, batch 4, grad-accum 8, 3 epochs, max length 2048---\emph{identical for every row}. Inference via vLLM, temperature 0, boxed extraction with numeric fallback. Pool: 4{,}998 English math instructions.
+
+\noindent\textbf{Benchmarks.} \emph{In-distribution (5):} SVAMP, ASDiv, AddSub, MATH500, GSM8K. \emph{Out-of-distribution (4):} MAWPS, TabMWP (table reasoning), GSM-Hard (adversarial numbers), CMATH (Chinese). The nine-benchmark average weights all benchmarks equally.
+
+\noindent\textbf{Significance.} Multi-seed (3 training seeds) for the headline configurations; paired McNemar per benchmark.
+
+\subsection{Math needs domain-specific data, but selection is not enough}
+Table~\ref{tab:indomain} confirms the usual in-distribution story: general-purpose selection methods (LIMA/IFD/SuperFiltering/DEITA/Cherry) collapse on math (50--55 avg), while LLM-rewrite refinement (Sanity, MISD) reaches $\sim$75. If we stopped here we would conclude refinement is a clear win---which is exactly the trap the next section springs.
+
+\begin{table}[h]\centering\small
+\caption{In-distribution accuracy (\%) on five math benchmarks, Qwen2.5-3B. General selection baselines transfer poorly to math; LLM-rewrite refinement looks strongly positive \emph{in-distribution}.}
+\label{tab:indomain}
+\begin{tabular}{lrr}
+\toprule
+Method & Data & In-dist.\ Avg\\
+\midrule
+\multicolumn{3}{l}{\textit{General-purpose selection (reproduced)}}\\
+IFD            & 4.0k & 50.22\\
+SuperFiltering & 4.0k & 52.04\\
+Random         & 4.0k & 53.05\\
+LIMA-style     & 4.0k & 53.10\\
+Cherry         & 4.0k & 53.74\\
+DEITA          & 4.0k & 55.26\\
+\midrule
+\multicolumn{3}{l}{\textit{LLM-rewrite refinement}}\\
+Raw + boxed             & 5.0k & 61.81\\
+Sanity (Claude rewrite) & 5.0k & 73.79\\
+Full MISD (V2)          & 4.7k & \textbf{75.33}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{The honest suite: refinement is net-negative}
+Table~\ref{tab:honest} adds the four OOD benchmarks. The picture inverts: \textbf{Full MISD is the \bad{worst} configuration} on the nine-benchmark average (61.5), \emph{below} the unrefined Sanity baseline (63.7), because its $+1.5$ in-distribution edge is overwhelmed by a $-6$ OOD drop concentrated in CMATH ($-12.6$). The configuration that applies \emph{neither} the boxed prompt nor the rewrite rules---just the clean rewrite---reaches \good{72.6}, $+8.9$ over the best baseline, with a tight three-seed spread.
+
+\begin{table*}[t]\centering\small
+\caption{Honest evaluation: in-distribution (5) $+$ OOD (4) math benchmarks, Qwen2.5-3B. ``Box'' = R3 boxed-answer prompt; ``Rules'' = R1--R5 rewrite; ``Filt'' = SymPy verification filter. Headline rows are mean$\pm$std over 3 seeds. \good{Green}=best, \bad{red}=worst on the nine-benchmark average.}
+\label{tab:honest}
+\begin{tabular}{lccc rrr r}
+\toprule
+Configuration & Box & Rules & Filt & In-dist.\ (5) & OOD (4) & \textbf{9-bench Avg} & CMATH \\
+\midrule
+Sanity (Claude rewrite + boxed) & \cmark & \xmark & \xmark & 73.79 & 51.07 & 63.69 & 47.74 \\
+\textbf{Full MISD (V2)}         & \cmark & \cmark & \cmark & \textbf{75.33} & 44.88 & \bad{61.48} & 35.15 \\
+\;\;+ boxed only (R3, filtered) & \cmark & R3     & \cmark & 75.33 & 47.49 & 62.96 & 47.09 \\
+\textbf{Minimal (no box, no rules)} & \xmark & \xmark & \cmark & 74.97 & 69.75 & \good{72.65} & 77.38 \\
+\;\;\textit{random-drop control}    & \xmark & \xmark & rand   & 74.76 & 68.73 & 72.08 & 75.38 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{The boxed prompt is the dominant harmful operator}
+Table~\ref{tab:ladder} adds operators one at a time. The decomposition is monotone and striking: the SymPy filter is roughly neutral, \textbf{the boxed prompt costs $-9.5$} on the honest suite, and the remaining rules cost a further $-1.2$. The boxed prompt---identified as ``the only useful rule'' by in-distribution ablation---is in fact the single most harmful intervention once OOD is counted: it lifts GSM8K extraction ($+14$) but collapses CMATH ($77\rightarrow47$) and MAWPS ($87\rightarrow50$).
+
+\begin{table}[h]\centering\small
+\caption{Operator ladder (9-bench avg). The much-touted boxed prompt is the largest \emph{negative} contributor on the honest suite.}
+\label{tab:ladder}
+\begin{tabular}{lrr}
+\toprule
+Configuration (cumulative) & 9-bench & $\Delta$\\
+\midrule
+Sanity baseline (+ boxed)        & 63.69 & ---\\
+Minimal: remove boxed \& rules   & \good{72.65} & \good{$+8.96$}\\
+\;\; add back boxed (R3)         & 62.96 & \bad{$-9.69$}\\
+\;\; add back all rewrite rules (= Full MISD) & 61.48 & \bad{$-1.48$}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{The verification filter contributes nothing}\label{sec:filter}
+Is the SymPy filter doing useful quality control, or merely deleting hard examples its 7B solver cannot handle? We run a \emph{difficulty-matched control}: drop the \emph{same number} (306) of \emph{randomly chosen} examples instead of the solver-flagged ones, holding everything else fixed. The random-drop model reaches 72.08 vs.\ the SymPy-filtered 72.65 (Table~\ref{tab:honest})---statistically indistinguishable. The filter's \emph{choice} of which examples to drop adds no measurable value; the gain attributed to ``verification'' in in-distribution ablations is an artifact of (i) removing format scaffolding and (ii) difficulty-biased pruning, not of answer-equivalence checking.
+
+\subsection{Error analysis}
+The gap between configurations is concentrated in \emph{answer extraction}, not reasoning: comparing correct/extraction-failure/computation-error rates, the boxed prompt mainly changes whether the model emits an extractable answer in the expected format, while computation-error rates are nearly constant across configurations. This is consistent with the format-tax interpretation: refinement teaches format compliance, which helps where the format matches and hurts where it does not.
+
+\section{Limitations}\label{sec:limitations}
+\textbf{Single base scale.} Headline results are on Qwen2.5-3B; we are extending to 7B/1.5B to test whether the format tax shrinks as base models already emit boxed answers by default (in progress). \textbf{Single source corpus.} All results use one 5{,}000-problem English pool; a second source corpus is needed to fully de-confound pipeline from corpus. \textbf{Solver-bound filter.} The verification filter uses a 7B solver, whose own accuracy bounds filter reliability; a stronger solver might recover value the random-drop control did not detect. We report these openly rather than over-claim.
+
+\section{Conclusion}
+A strictly controlled, honest evaluation overturns the in-distribution story of math instruction-data refinement. Rewriting problems into a canonical boxed English format raises in-distribution accuracy but imposes a large cross-lingual/OOD generalization tax, making the fully refined pipeline the worst configuration on an honest nine-benchmark suite; the symbolic-verification filter adds nothing beyond random pruning. The actionable message is to refine lightly: do not bake in a fixed answer-format scaffold when robustness matters, and validate any verification filter against a random-drop control.
+
+\bibliography{misd}
+
+\end{document}
