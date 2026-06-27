@@ -64,7 +64,7 @@ Under this lens the standard recipe looks much worse than its in-distribution nu
 \noindent\textbf{Contributions.}
 \begin{itemize}\itemsep 1pt
 \item A confounder-controlled decomposition of a representative math-data refinement pipeline (structure / rewrite / verify) into its individual operators, each measured on an honest in-distribution $+$ OOD suite (Section~\ref{sec:exp}).
-\item The finding of a \emph{format-scaffolding generalization tax}: the boxed-answer prompt and English rewrite rules trade in-distribution extraction for a large cross-lingual/OOD loss, making the full pipeline net-negative on the honest suite (Tables~\ref{tab:honest}, \ref{tab:ladder}).
+\item The finding of a \emph{format-scaffolding generalization tax}: the boxed-answer prompt and English rewrite rules trade in-distribution extraction for a large cross-lingual/OOD loss, making the full pipeline net-negative on the honest suite (Tables~\ref{tab:main}, \ref{tab:ladder}).
 \item A difficulty-matched control showing that the symbolic-verification filter contributes $\approx 0$: random-sample dropping matches solver-flagged dropping (Section~\ref{sec:filter}).
 \item Actionable guidance for practitioners: prefer light-touch refinement; do not impose a fixed answer-format scaffold if cross-lingual or OOD robustness matters; do not assume verification filtering adds value without a random-drop control.
 \end{itemize}
@@ -94,47 +94,34 @@ Each operator can be switched on or off independently, yielding the configuratio
 
 \noindent\textbf{Significance.} Multi-seed (3 training seeds) for the headline configurations; paired McNemar per benchmark.
 
-\subsection{Math needs domain-specific data, but selection is not enough}
-Table~\ref{tab:indomain} confirms the usual in-distribution story: general-purpose selection methods (LIMA/IFD/SuperFiltering/DEITA/Cherry) collapse on math (50--55 avg), while LLM-rewrite refinement (Sanity, MISD) reaches $\sim$75. If we stopped here we would conclude refinement is a clear win---which is exactly the trap the next section springs.
+\subsection{Main results}
+Table~\ref{tab:main} is the central result. Read \emph{in-distribution only} (left block), the usual story holds: general selection methods collapse on math (50--55), and LLM-rewrite refinement reaches $\sim$75---refinement looks like a clear win. Read \emph{honestly} (adding the OOD block and the nine-benchmark average), the story inverts: the full refinement pipeline is the \bad{worst} complete configuration (61.8), \emph{below} the unrefined Sanity baseline (63.7), while \good{Ours}---a minimal configuration that applies \emph{neither} the boxed prompt nor the rewrite rules---wins the average at \good{72.7} ($+9.0$), and wins every word-problem and every OOD column. The only columns where the heavier configurations lead are the two formal in-distribution benchmarks (MATH500, GSM8K), exactly the format-matched regime their English boxed scaffolding is tuned for.
 
-\begin{table}[h]\centering\small
-\caption{In-distribution accuracy (\%) on five math benchmarks, Qwen2.5-3B. General selection baselines transfer poorly to math; LLM-rewrite refinement looks strongly positive \emph{in-distribution}.}
-\label{tab:indomain}
-\begin{tabular}{lrr}
+\begin{table*}[t]\centering\footnotesize
+\setlength{\tabcolsep}{3.4pt}
+\caption{Main results (\%) on Qwen2.5-3B: five in-distribution $+$ four out-of-distribution math benchmarks. Identical base model, LoRA configuration, and evaluation for every row; \emph{only the training data differs}. \textbf{Bold}=best, \underline{underline}=second-best among complete rows. ``Ours'' is the minimal configuration (verification-filtered; no boxed prompt; no rewrite rules), averaged over 3 seeds. Selection-baseline OOD evaluation in progress ($-$).}
+\label{tab:main}
+\begin{tabular}{l c ccccc cccc c}
 \toprule
-Method & Data & In-dist.\ Avg\\
+ & & \multicolumn{5}{c}{\textbf{In-Distribution}} & \multicolumn{4}{c}{\textbf{Out-of-Distribution}} & \\
+\cmidrule(lr){3-7}\cmidrule(lr){8-11}
+Method & Data & SVAMP & ASDiv & AddSub & MATH500 & GSM8K & MAWPS & TabMWP & G-Hard & CMATH & \textbf{Avg} \\
 \midrule
-\multicolumn{3}{l}{\textit{General-purpose selection (reproduced)}}\\
-IFD            & 4.0k & 50.22\\
-SuperFiltering & 4.0k & 52.04\\
-Random         & 4.0k & 53.05\\
-LIMA-style     & 4.0k & 53.10\\
-Cherry         & 4.0k & 53.74\\
-DEITA          & 4.0k & 55.26\\
+\multicolumn{12}{l}{\textit{Data Selection (reproduced)}}\\
+IFD            & 4.0k & 43.70 & 58.35 & 37.22 & 41.80 & 70.05 & $-$ & $-$ & $-$ & $-$ & $-$\\
+SuperFiltering & 4.0k & 44.30 & 67.05 & 37.72 & 40.60 & 70.51 & $-$ & $-$ & $-$ & $-$ & $-$\\
+Random         & 4.0k & 46.30 & 68.90 & 40.76 & 38.20 & 71.11 & $-$ & $-$ & $-$ & $-$ & $-$\\
+LIMA           & 4.0k & 49.60 & 66.62 & 35.70 & 43.20 & 70.36 & $-$ & $-$ & $-$ & $-$ & $-$\\
+Cherry         & 4.0k & 47.80 & 67.48 & 38.99 & 43.00 & 71.42 & $-$ & $-$ & $-$ & $-$ & $-$\\
+DEITA          & 4.0k & 52.50 & 69.47 & 45.82 & 40.60 & 67.93 & $-$ & $-$ & $-$ & $-$ & $-$\\
 \midrule
-\multicolumn{3}{l}{\textit{LLM-rewrite refinement}}\\
-Raw + boxed             & 5.0k & 61.81\\
-Sanity (Claude rewrite) & 5.0k & 73.79\\
-Full MISD (V2)          & 4.7k & \textbf{75.33}\\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{The honest suite: refinement is net-negative}
-Table~\ref{tab:honest} adds the four OOD benchmarks. The picture inverts: \textbf{Full MISD is the \bad{worst} configuration} on the nine-benchmark average (61.5), \emph{below} the unrefined Sanity baseline (63.7), because its $+1.5$ in-distribution edge is overwhelmed by a $-6$ OOD drop concentrated in CMATH ($-12.6$). The configuration that applies \emph{neither} the boxed prompt nor the rewrite rules---just the clean rewrite---reaches \good{72.6}, $+8.9$ over the best baseline, with a tight three-seed spread.
-
-\begin{table*}[t]\centering\small
-\caption{Honest evaluation: in-distribution (5) $+$ OOD (4) math benchmarks, Qwen2.5-3B. ``Box'' = R3 boxed-answer prompt; ``Rules'' = R1--R5 rewrite; ``Filt'' = SymPy verification filter. Headline rows are mean$\pm$std over 3 seeds. \good{Green}=best, \bad{red}=worst on the nine-benchmark average.}
-\label{tab:honest}
-\begin{tabular}{lccc rrr r}
-\toprule
-Configuration & Box & Rules & Filt & In-dist.\ (5) & OOD (4) & \textbf{9-bench Avg} & CMATH \\
-\midrule
-Sanity (Claude rewrite + boxed) & \cmark & \xmark & \xmark & 73.79 & 51.07 & 63.69 & 47.74 \\
-\textbf{Full MISD (V2)}         & \cmark & \cmark & \cmark & \textbf{75.33} & 44.88 & \bad{61.48} & 35.15 \\
-\;\;+ boxed only (R3, filtered) & \cmark & R3     & \cmark & 75.33 & 47.49 & 62.96 & 47.09 \\
-\textbf{Minimal (no box, no rules)} & \xmark & \xmark & \cmark & 74.97 & 69.75 & \good{72.65} & 77.38 \\
-\;\;\textit{random-drop control}    & \xmark & \xmark & rand   & 74.76 & 68.73 & 72.08 & 75.38 \\
+\multicolumn{12}{l}{\textit{Data Refinement}}\\
+Raw $+$ boxed             & 5.0k & 60.50 & 81.74 & 54.68 & 38.60 & 73.54 & $-$ & $-$ & $-$ & $-$ & $-$\\
+Sanity (Claude rewrite)   & 5.0k & 75.80 & 84.02 & 80.00 & 52.80 & 76.35 & 57.14 & 67.71 & 31.69 & 47.74 & 63.69\\
+Full MISD (refine pipeline)& 4.7k & 76.80 & \underline{85.31} & 80.76 & \underline{52.80} & \underline{80.97} & 53.36 & 60.62 & 30.40 & 35.15 & \bad{61.80}\\
+\;\;\; w/ boxed prompt only & 4.7k & 75.80 & 84.02 & 79.75 & \textbf{54.00} & \textbf{83.09} & 49.58 & 63.74 & 29.57 & 47.09 & 62.96\\
+\textbf{Ours (minimal)}    & 4.7k & \textbf{83.20} & \textbf{91.44} & \textbf{88.73} & 42.50 & 69.45 & \textbf{86.83} & \textbf{78.38} & \textbf{36.39} & \textbf{77.38} & \good{\textbf{72.70}}\\
+\;\;\; \textit{random-drop control} & 4.7k & \underline{81.20} & 91.44 & \underline{88.61} & 42.40 & 70.13 & \underline{86.55} & \underline{78.05} & \underline{34.95} & \underline{75.38} & \underline{72.08}\\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -158,7 +145,7 @@ Minimal: remove boxed \& rules   & \good{72.65} & \good{$+8.96$}\\
 \end{table}
 
 \subsection{The verification filter contributes nothing}\label{sec:filter}
-Is the SymPy filter doing useful quality control, or merely deleting hard examples its 7B solver cannot handle? We run a \emph{difficulty-matched control}: drop the \emph{same number} (306) of \emph{randomly chosen} examples instead of the solver-flagged ones, holding everything else fixed. The random-drop model reaches 72.08 vs.\ the SymPy-filtered 72.65 (Table~\ref{tab:honest})---statistically indistinguishable. The filter's \emph{choice} of which examples to drop adds no measurable value; the gain attributed to ``verification'' in in-distribution ablations is an artifact of (i) removing format scaffolding and (ii) difficulty-biased pruning, not of answer-equivalence checking.
+Is the SymPy filter doing useful quality control, or merely deleting hard examples its 7B solver cannot handle? We run a \emph{difficulty-matched control}: drop the \emph{same number} (306) of \emph{randomly chosen} examples instead of the solver-flagged ones, holding everything else fixed. The random-drop model reaches 72.08 vs.\ the SymPy-filtered 72.65 (Table~\ref{tab:main})---statistically indistinguishable. The filter's \emph{choice} of which examples to drop adds no measurable value; the gain attributed to ``verification'' in in-distribution ablations is an artifact of (i) removing format scaffolding and (ii) difficulty-biased pruning, not of answer-equivalence checking.
 
 \subsection{Error analysis}
 The gap between configurations is concentrated in \emph{answer extraction}, not reasoning: comparing correct/extraction-failure/computation-error rates, the boxed prompt mainly changes whether the model emits an extractable answer in the expected format, while computation-error rates are nearly constant across configurations. This is consistent with the format-tax interpretation: refinement teaches format compliance, which helps where the format matches and hurts where it does not.
