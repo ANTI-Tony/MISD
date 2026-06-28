@@ -150,24 +150,58 @@ We instantiate the standard recipe as a three-stage pipeline and treat each stag
 \centering
 \begin{tikzpicture}[
   font=\scriptsize,
-  io/.style={draw, rounded corners, fill=boxcol, align=left, text width=2.45cm, inner sep=4pt, minimum height=15mm},
-  onode/.style={draw, rounded corners, fill=outcol, align=left, text width=2.45cm, inner sep=4pt, minimum height=15mm},
-  algo/.style={draw, rounded corners, fill=stagecol, text=white, align=center, text width=1.75cm, inner sep=4pt, minimum height=15mm},
-  fin/.style={draw, rounded corners, fill=goodbg, align=left, text width=2.45cm, inner sep=4pt, minimum height=15mm},
-  ar/.style={-{Latex[length=2mm]}, very thick, stagecol},
-  node distance=4.5mm,
+  icard/.style={draw=gray!55, rounded corners=2pt, fill=blue!5, align=left, text width=2.7cm, inner sep=3.5pt},
+  pcard/.style={draw=gray!50, rounded corners=2pt, fill=gray!4, align=left, text width=3.3cm, inner sep=3.5pt},
+  ocard/.style={draw=gray!55, rounded corners=2pt, fill=orange!7, align=left, text width=3.5cm, inner sep=3.5pt},
+  vcard/.style={draw=gray!55, rounded corners=2pt, fill=stagecol!7, align=left, text width=3.2cm, inner sep=3.5pt},
+  hdr/.style={font=\itshape\bfseries\scriptsize, text=white, fill=stagecol, rounded corners=2pt, inner sep=2.5pt},
+  ar/.style={-{Latex[length=1.7mm]}, semithick, gray!70},
 ]
-\node[io] (in) {\textbf{Input}\\\,\\Square $ABCD$ inscribed under $y{=}x^2{-}8x{+}12$; find area. [asy fig]\\ \textit{ans:} 16};
-\node[algo, right=of in] (a1) {\textbf{Alg.\,1}\\Structure\\\textit{(typing)}};
-\node[onode, right=of a1] (o1) {\textbf{Output 1}\\\,\\tags: \{visual:\,Y, question:\,find, vars:\,Y, mcq:\,N\}};
-\node[algo, right=of o1] (a2) {\textbf{Alg.\,2}\\Rewrite\\\textit{(R1--R5)}};
-\node[onode, right=of a2] (o2) {\textbf{Output 2}\\\,\\$+$ ``A,C on curve''\\$+$ \texttt{\char92 boxed} prompt};
-\node[algo, right=of o2] (a3) {\textbf{Alg.\,3}\\Verify\\\textit{(S1--S5,}\\\textit{SymPy)}};
-\node[fin, right=of a3] (fin) {\textbf{Final}\\\,\\S1--S5 pass; SymPy ans\,$=16$\,\ding{51}\\$\Rightarrow$ keep sample};
-\draw[ar] (in)--(a1); \draw[ar] (a1)--(o1); \draw[ar] (o1)--(a2);
-\draw[ar] (a2)--(o2); \draw[ar] (o2)--(a3); \draw[ar] (a3)--(fin);
+\tikzset{
+ robot/.pic={\draw[draw=stagecol, fill=stagecol!18, rounded corners=0.4pt] (-2.3mm,-2.1mm) rectangle (2.3mm,2.3mm); \fill[stagecol](-1.0mm,0.5mm) circle(0.42mm); \fill[stagecol](1.0mm,0.5mm) circle(0.42mm); \draw[stagecol,thin] (-1.1mm,-1.1mm)--(1.1mm,-1.1mm); \draw[stagecol,thin](0,2.3mm)--(0,3.5mm); \fill[stagecol](0,3.8mm) circle(0.42mm);},
+ db/.pic={\draw[draw=gray!60,fill=gray!14] (-2.1mm,2.2mm) arc(180:360:2.1mm and 0.8mm) -- (2.1mm,-2.2mm) arc(360:180:2.1mm and 0.8mm) -- cycle; \draw[gray!60] (-2.1mm,2.2mm) arc(180:360:2.1mm and 0.8mm);},
+}
+\def\xin{2.15} \def\xp{6.7} \def\xo{11.6} \def\xd{15.7}
+% ===================== Panel (a) Structure =====================
+\def\ya{0}
+\node[hdr] at (1.55,\ya+1.35) {(a) Structure --- Phase~1 typing};
+\node[icard] (ain) at (\xin,\ya) {\textbf{Raw}: Square $ABCD$ inscribed under $y{=}x^2{-}8x{+}12$; find the area. [asy fig], \textit{ans} 16};
+\node[pcard] (ap) at (\xp,\ya) {\textbf{Prompt:} ``You are a \textcolor{misdred}{typing expert}. Tag this problem on 6 dimensions: setup, conditions, question, format, visual, mcq.''};
+\pic at ($(ap.north west)+(2mm,1.6mm)$) {robot};
+\node[ocard] (ao) at (\xo,\ya) {\textbf{Tags:} \{\,visual:\,\textcolor{stagecol}{\textbf{Y\,(critical)}}, question:\,find, vars:\,Y, format:\,--, mcq:\,N\,\}};
+\draw[ar] (ain)--(ap); \draw[ar] (ap)--(ao);
+% ===================== Panel (b) Rewrite =====================
+\def\yb{-3.0}
+\node[hdr] at (1.7,\yb+1.55) {(b) Rewrite --- Phase~3 rules R1--R5 (additive)};
+\node[icard] (bin) at (\xin,\yb) {tagged problem $+$ tags};
+\node[pcard] (bp) at (\xp,\yb) {\textbf{Prompt:} ``You are a \textcolor{misdred}{rewrite expert}. Apply \emph{only} the triggered rules; edits are \emph{additive} (never delete).''\\[1pt]
+\textcolor{black!70}{triggered:} \tikz[baseline]{\node[draw=stagecol!50,fill=stagecol!12,rounded corners=1pt,inner sep=1.3pt,font=\tiny]{R1};} \tikz[baseline]{\node[draw=misdred!50,fill=misdred!12,rounded corners=1pt,inner sep=1.3pt,font=\tiny]{R3};} \tikz[baseline]{\node[draw=stagecol!50,fill=stagecol!12,rounded corners=1pt,inner sep=1.3pt,font=\tiny]{R4};}};
+\pic at ($(bp.north west)+(2mm,1.6mm)$) {robot};
+\node[ocard] (bo) at (\xo,\yb) {\textbf{Rewritten:} \dots find the area. \textcolor{misdgreen}{$+$ ``A,C on parabola; B,D on $x$-axis'' (R1)} \textcolor{misdred}{$+$ ``Give the final answer inside \texttt{\char92 boxed\{\}}'' (R3)}};
+\draw[ar] (bin)--(bp); \draw[ar] (bp)--(bo);
+\node[draw=misdred!60, dashed, rounded corners=2pt, fill=misdred!5, align=left, text width=3.1cm, inner sep=3pt, font=\scriptsize] (warn) at (\xd+0.1,\yb) {\textcolor{misdred}{\textbf{!}\ Format scaffolding:} helps in-dist.\ extraction but \textbf{taxes OOD} (CMATH $-30$). \textcolor{misdred}{Disabled in MISD (ours).}};
+\draw[ar, misdred!70, dashed] (bo)--(warn);
+% ===================== Panel (c) Verify =====================
+\def\yc{-6.05}
+\node[hdr] at (2.05,\yc+1.5) {(c) Verify --- Phase~4 safety S1--S5 $+$ Phase~5 SymPy};
+\node[vcard] (vin) at (\xin,\yc) {\textbf{Safety S1--S5:} LaTeX\,\ding{51}\ vars\,\ding{51}\ nums\,\ding{51}\ format\,\ding{51}\ mcq\,\ding{51}\ $\Rightarrow$ pass (else roll back)};
+\node[pcard] (vp) at (\xp,\yc) {\textbf{SymPy check:} solve \emph{raw} \& \emph{rewritten} with Qwen2.5-7B; extract \texttt{\char92 boxed}; compare by symbolic equivalence.};
+\pic at ($(vp.north west)+(2mm,1.6mm)$) {robot};
+\node[ocard, fill=goodbg] (vo) at (\xo,\yc) {\textbf{Decision:} ans $16 = 16$\,\textcolor{misdgreen}{\ding{51}} $\Rightarrow$ \textcolor{misdgreen}{\textbf{keep}}\\(if mismatch: \textcolor{misdred}{drop})};
+\pic at (\xd,\yc+0.15) {db};
+\node[font=\scriptsize, align=center] at (\xd,\yc-0.7) {training set\\(4{,}692)};
+\draw[ar] (vin)--(vp); \draw[ar] (vp)--(vo); \draw[ar] (vo)--(\xd-0.4,\yc);
+% vertical flow between panels
+\draw[ar, stagecol] (ao.south) .. controls +(0,-0.5) and +(0,0.5) .. (bin.north);
+\draw[ar, stagecol] (bo.south) .. controls +(0,-0.5) and +(0,0.5) .. (vin.north);
+% panel backgrounds
+\begin{scope}[on background layer]
+\node[fill=gray!6, rounded corners, fit=(ain)(ao), inner sep=3mm] {};
+\node[fill=gray!6, rounded corners, fit=(bin)(warn), inner sep=3mm] {};
+\node[fill=goodbg!40, rounded corners, fit=(vin)(vo), inner sep=3mm] (vbg) {};
+\end{scope}
 \end{tikzpicture}
-\caption{\textbf{MISD framework and data flow on one example.} A raw problem passes three toggleable operators: \textbf{Structure} types it (Output~1), \textbf{Rewrite} adds rule-triggered edits (Output~2), and \textbf{Verify} checks structural safety (S1--S5) and SymPy answer-equivalence before keeping the sample. Our controlled study finds the Rewrite stage's format scaffolding (notably the \texttt{\char92 boxed} prompt) helps in-distribution but taxes OOD; \textbf{MISD (ours)} therefore keeps Structure$+$Verify and disables those rewrites.}
+\caption{\textbf{The MISD framework (rich view).} A raw problem flows through three operator panels. \textbf{(a) Structure} prompts an LLM to assign six structural tags. \textbf{(b) Rewrite} applies only the rules triggered by those tags, additively (green/red text marks the added scaffolding); our study finds this format scaffolding---notably the \texttt{\char92 boxed} prompt (R3)---helps in-distribution but \emph{taxes} OOD, so \textbf{MISD (ours) disables it}. \textbf{(c) Verify} runs pure-Python safety checks (S1--S5, roll back on violation) and a SymPy answer-equivalence test before admitting the sample. \textbf{MISD (ours) $=$ (a)$+$(c)}; panel (b) is studied and switched off.}
 \label{fig:arch}
 \end{figure*}
 
